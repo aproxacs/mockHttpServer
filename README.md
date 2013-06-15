@@ -130,14 +130,10 @@ To run spec, run `spec_runner.html` file with the browser.
 
 - documentation : 2h
 
-- easy addding for access_token : 2h
+
 - box.net examples : 1h
 
 - IE support : 1h
-
-werwer
-
-    MockHttpServer.addAccessToken({host: "box.net", access_token_key: "Authorization", access_token: "aa"})
 
 
 

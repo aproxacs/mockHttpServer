@@ -9,88 +9,145 @@ MockHttpServer = function(global) {
                                    ? function() { return new store.GlobalActiveXObject("MSXML2.XMLHTTP.3.0") } : false;
 
     var mocked = {};
-    function mockRespond(xhr) {
+    var accessTokens = {};
+    var xhr = null;
 
-        parseRequestText(xhr);
+    function mockRespond(mockXhr) {
+
+        xhr = mockXhr;
         // console.log(xhr)
+        try {
+            parseRequestText();
 
-        var mock = getFirstMatchedMock(xhr);
-        if(mock) {
-            setHeaders(xhr, mock.response.headers);
+            var mock = getFirstMatchedMock();
+            if(!mock) { throw "Not Registered"; }
+            // console.log(mock);
 
-            var data = mockJson.generateTemplate(mock.response.template);
-            xhr.receive(mock.response.status, data);
-        }        
-        else {
-            // console.log("nothing matched");
+            if( mock.request.requireAccessToken ) {
+                processAccessToken();
+            }
+            sendMockResponse(mock.response);
+
+        }
+        catch(err) {
+            // console.log(err)
+            handleError(err);
+        }
+    }
+
+    function handleError(err) {
+        if(err === "Invalid JSON") {
+            xhr.receive(200, "requestText[\"" + xhr.requestText + "\"] is not valid json")
+        }
+        if(err === "Invalid Access Token") {
+            var accessToken = getAccessToken(xhr.urlParts.host);
+            sendMockResponse(accessToken.errorResponse);
+        }
+        if(err === "Access Token Not Registered") {
+            xhr.receive(200, "accessToken for " + xhr.urlParts.host + " is not registered yet.");        
+        }
+        if(err === "Not Registered") {
             xhr.receive(200, "The url[" + xhr.method + " " + xhr.url + "] is not registered to mock server");
         }
     }
 
-    function getFirstMatchedMock(xhr) {
+    function sendMockResponse(response) {
+        // console.log(response);
+        setHeaders(response.headers);
+
+        var data = mockJson.generateTemplate(response.template);
+        // console.log(data)
+        xhr.receive(response.status, data);
+    }
+
+
+    function processAccessToken() {
+        var accessToken = getAccessToken(xhr.urlParts.host);
+        // console.log(accessToken)
+        if( accessToken ) {
+            if( isInvalidAccessToken(accessToken) ) {
+                throw "Invalid Access Token";
+            }
+        }
+        else {
+            throw "Access Token Not Registered";
+        }
+    }
+
+    function getAccessToken(host) {
+        return accessTokens[host];
+    }
+
+    function isInvalidAccessToken(accessToken) {
+        var token = xhr.getRequestHeader(accessToken.key);
+        if(!token && xhr.requestData) {
+            token = xhr.requestData[accessToken.key];
+        }
+        return token !== accessToken.value;
+    }
+
+    function getFirstMatchedMock() {
         for( key in mocked ) {
             var mock = mocked[key];
 
-            if( isRequestMatched(xhr, mock.request) ) {
+            if( isRequestMatched(mock.request) ) {
                 return mock;
             }
         }
         return null;
     }
 
-    function parseRequestText(xhr) {
+    function parseRequestText() {
         xhr.requestData = null;
 
         if(!xhr.requestText) { return null; }
         
         var mimetype = xhr.getRequestHeader("content-type");
         mimetype = mimetype && mimetype.split(';', 1)[0];
+        // console.log(mimetype);
 
         if(mimetype === "application/json") {
-            xhr.requestData = parseJson(xhr);
+            xhr.requestData = parseJson(xhr.requestText);
         }
         if(mimetype === "application/x-www-form-urlencoded") {
             xhr.requestData = parseUrlEncoded(xhr.requestText);
         }
     }
 
-    function parseJson(xhr) {
+    function parseJson(text) {
         try {
-            return JSON.parse(xhr.requestText);
+            return JSON.parse(text);
         }
         catch(err) {
-            // console.log("requestText is not a json format")
-            xhr.receive(200, "requestText[\"" + xhr.requestText + "\"] is not valid json")
-            return null;
+            throw "Invalid JSON"
         }
     }
 
-    function parseUrlEncoded(xhr) {
+    function parseUrlEncoded(text) {
         var parser = /(?:^|&)([^&=]*)=?([^&]*)/g;
         var data = {};
 
         try {
-            xhr.requestText.replace(parser, function ($0, $1, $2) {
+            text.replace(parser, function ($0, $1, $2) {
                 if ($1) data[$1] = $2;
             });
             return data;
         }
         catch(err) {
-            return null;
+            throw "Invalid URL Encoded"
         }
     }
 
-    function isRequestMatched(xhr, mockRequest) {
+    function isRequestMatched(mockRequest) {
         // console.log(isMethodMatched(xhr, mockRequest))
         // console.log(isUrlMatched(xhr, mockRequest))
         // console.log(isHeaderMatched(xhr, mockRequest))
         // console.log(isDataMatched(xhr, mockRequest))
         try {
-            return ( isMethodMatched(xhr, mockRequest) && 
-                     isUrlMatched(xhr, mockRequest) &&
-                     isHeaderMatched(xhr, mockRequest) &&
-                     isDataMatched(xhr, mockRequest)
-            );
+            return isMethodMatched(mockRequest) && 
+                   isUrlMatched(mockRequest) &&
+                   isHeaderMatched(mockRequest) &&
+                   isDataMatched(mockRequest);
         }
         catch(err) {
             // console.log(err)
@@ -98,24 +155,24 @@ MockHttpServer = function(global) {
         }
     }
 
-    function isMethodMatched(xhr, mockRequest) {
+    function isMethodMatched(mockRequest) {
         if( !mockRequest.method ) { return true; }
         return xhr.method.toLowerCase() === mockRequest.method.toLowerCase()
     }
 
-    function isUrlMatched(xhr, mockRequest) {
+    function isUrlMatched(mockRequest) {
         // console.log(mockRequest.url)
         // console.log(xhr.url)
         return isTextMatched(mockRequest.url, xhr.url);
     }
 
-    function isHeaderMatched(xhr, mockRequest) {
+    function isHeaderMatched(mockRequest) {
         return isObjectMatched(mockRequest.headers, xhr.requestHeaders);
     }
 
-    function isDataMatched(xhr, mockRequest) {
-        // console.log(xhr.requestText)
+    function isDataMatched(mockRequest) {
         // console.log(mockRequest.data)
+        // console.log(xhr.requestData)
         return isObjectMatched(mockRequest.data, xhr.requestData || {});
     }
 
@@ -164,7 +221,7 @@ MockHttpServer = function(global) {
         return true;
     }
 
-    function setHeaders(xhr, headers) {
+    function setHeaders(headers) {
         for( key in headers ) {
             xhr.setResponseHeader(key, headers[key]);    
         }
@@ -182,6 +239,24 @@ MockHttpServer = function(global) {
 
 
     return {
+        // Usage :
+        // MockHttpServer.addAccessToken({
+        //    host: "box.net", 
+        //    key: "Authorization", 
+        //    value: "aa",
+        //    errorResponse: {
+        //      status: 401,
+        //      headers: {},
+        //      template: { "error": "invalid_token" }
+        //    }
+        // })
+        setAccessToken: function(options) {
+            accessTokens[options.host] = options;
+        },
+        clearAccessTokens: function() {
+            accessTokens = {};
+        },
+
         register: function(request, response) {
             var key = Math.random().toString(36);
 

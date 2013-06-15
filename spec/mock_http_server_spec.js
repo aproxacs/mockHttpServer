@@ -1,4 +1,4 @@
-describe("MockHttpServer", function() {
+xdescribe("MockHttpServer", function() {
   var mockRequest = {url: "http://test.com/api"};
   var mockResponse = {status: 200, headers: {}, template: {}};
   var mockedKey = null;
@@ -391,6 +391,115 @@ describe("jQuery test", function() {
           expect(data).toEqual("requestText[\"name=james\"] is not valid json");
         });
     });
+  });
+
+
+  describe("when access token is required for mockRequest", function() {
+
+    var mockAccessToken = null;
+
+    beforeEach(function() {
+      mockRequest = { 
+        url: "http://test.com/api",
+        requireAccessToken: true
+      };
+      mockAccessToken = {
+        host: "test.com", 
+        key: "Auth", 
+        value: "Ar369",
+        errorResponse: {
+          status: 401,
+          headers: {},
+          template: { "error": "invalid_token" }
+        }
+      };
+      request = { url: "http://test.com/api" };
+    });
+
+    afterEach(function() {
+      MockHttpServer.clearAccessTokens();
+    });
+
+    describe("without accessToken setup", function() {
+      beforeEach(function() {
+        MockHttpServer.register(mockRequest, mockResponse);
+      });
+
+      it("responds error", function() {
+          $.ajax(request).done(function(data, textStatus, jqXHR) {
+            expect(data).toEqual("accessToken for test.com is not registered yet.");
+          });
+      });
+    });
+
+    describe("with accessToken setup", function() {
+      beforeEach(function() {
+        MockHttpServer.setAccessToken(mockAccessToken);
+        MockHttpServer.register(mockRequest, mockResponse);
+      });
+
+      describe("for request without accessToken", function() {
+        it("responds error", function() {
+          $.ajax(request).error(function(jqXHR, textStatus) {
+            expect(jqXHR.status).toEqual(401);
+          }).done(function() {
+            // should not come here
+            expect(true).toEqual(false);            
+          });
+        });
+      });
+
+      describe("for request with invalid accessToken", function() {
+        beforeEach(function() {
+          request.headers = { "Auth": "Ar379" };
+        });
+        
+        it("responds error", function() {
+          $.ajax(request).error(function(jqXHR, textStatus) {
+            expect(jqXHR.status).toEqual(401);
+          }).done(function() {
+            // should not come here
+            expect(true).toEqual(false);            
+          });
+
+        });
+      });
+
+      describe("for request with valid accessToken in header", function() {
+        beforeEach(function() {
+          request.headers = { "Auth": "Ar369" };
+        });
+
+        it("responds mock response", function() {
+          $.ajax(request).done(function(data, textStatus, jqXHR) {
+            expect(jqXHR.status).toEqual(200);
+            expect(data.name).toBeDefined();
+          }).error(function() {
+            // should not come here
+            expect(true).toEqual(false);
+          });
+        });
+      });
+
+      describe("for request with valid accessToken in data", function() {
+        beforeEach(function() {
+          request.type = "POST";
+          request.data = { "Auth": "Ar369" };
+        });
+
+        it("responds mock response", function() {
+          $.ajax(request).done(function(data, textStatus, jqXHR) {
+            expect(jqXHR.status).toEqual(200);
+            expect(data.name).toBeDefined();
+          }).error(function() {
+            // should not come here
+            expect(true).toEqual(false);
+          });
+        });
+      });
+
+    });
+
   });
   
 });
