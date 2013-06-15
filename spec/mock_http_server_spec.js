@@ -1,4 +1,17 @@
 describe("MockHttpServer", function() {
+  var mockRequest = {url: "http://test.com/api"};
+  var mockResponse = {status: 200, headers: {}, template: {}};
+  var mockedKey = null;
+
+  beforeEach(function() {
+    mockedKey = MockHttpServer.register(mockRequest, mockResponse);
+  });
+
+  afterEach(function() {
+    MockHttpServer.off();
+    MockHttpServer.clearMocked();
+  });
+
   describe("on", function() {
     it("changes XMLHttpRequest to MockHttpRequest", function() {
       MockHttpServer.on();
@@ -17,54 +30,44 @@ describe("MockHttpServer", function() {
   });
 
   describe("register", function() {
-    var request = {url: "http://test.com/api"};
-    var response = {status: 200, header: {}, template: {}};
+    it("returns a registered mockedKey", function() {
+      var mocked = MockHttpServer.getMocked(mockedKey);
 
-    afterEach(function() {
-      MockHttpServer.clearMocked();
+      expect(mocked).not.toBeNull();
     });
 
-    it("returns a registered key", function() {
-      var key = MockHttpServer.register(request, response);
-      var mocked = MockHttpServer.getMocked();
+    it("adds mocked request and response to the mocked list", function() {
+      var mocked = MockHttpServer.getMocked(mockedKey);
 
-      expect(mocked[key]).toBeDefined();
-    });
-
-    it("adds request and response to the mocked list", function() {
-      var key = MockHttpServer.register(request, response);
-      var mocked = MockHttpServer.getMocked();
-
-      expect(mocked[key].request).toEqual(request);
-      expect(mocked[key].response).toEqual(response);
+      expect(mocked.request).toEqual(mockRequest);
+      expect(mocked.response).toEqual(mockResponse);
     });
   });
 
   describe("deregister", function() {
-    var request = {url: "http://test.com/api"};
-    var response = {status: 200, header: {}, template: {}};
-
-    afterEach(function() {
-      MockHttpServer.clearMocked();
-    });
 
     it("deletes mock", function() {
-      var key = MockHttpServer.register(request, response);
-      MockHttpServer.deregister(key);
+      MockHttpServer.deregister(mockedKey);
 
-      expect(MockHttpServer.getMocked()).toEqual({});      
+      expect(MockHttpServer.getMocked(mockedKey)).toBeNull()
     })
   });
 });
 
 
-describe("mocked ajax request test", function() {
-  var request = {url: "http://test.com/api"};
-  var response = {status: 200, header: {}, template: {"name|1-3": "@LETTER_UPPER@LOREM "}};
-    
+describe("jQuery test", function() {
+  var mockRequest = null; 
+  var mockResponse = null;
+  var request = null;
+
   beforeEach(function() {
+    mockResponse = {
+      status: 200, 
+      headers: {"Tag": "hello"}, 
+      template: {"name|1-3": "@LETTER_UPPER@LOREM "}
+    };
+
     MockHttpServer.on();
-    MockHttpServer.register(request, response);
   });
 
   afterEach(function() {
@@ -72,17 +75,332 @@ describe("mocked ajax request test", function() {
     MockHttpServer.clearMocked();
   });
 
-  it("responds mocked response for the registered request", function() {
-    $.ajax("http://test.com/api").done(function(data) {
-      expect(data.name).toBeDefined();
+  function setJsonData(request, data) {
+    request.data = JSON.stringify(data);
+    request.contentType = "application/json";
+
+  }
+
+  describe("when registered with a string url", function() {
+
+    beforeEach(function() {
+      mockRequest = {url: "http://test.com/api"};
+      MockHttpServer.register(mockRequest, mockResponse);
+      request = { url: "http://test.com/api" };
+    });
+
+    describe("when GET url is requested", function() {
+      it("responds mocked response", function() {
+        $.ajax(request).done(function(data, textStatus, jqXHR) {
+          expect(jqXHR.status).toEqual(200);
+          expect(jqXHR.getResponseHeader("Tag")).toEqual("hello");
+          expect(data.name).toBeDefined();
+        });
+      });
+
+      it("responds mocked response when request has headers", function() {
+        request.headers = { "AGENT": "12345" }
+        $.ajax(request).done(function(data, textStatus, jqXHR) {
+          expect(data.name).toBeDefined();
+        });
+      });
+    });
+
+    describe("when POST url is requested", function() {
+      beforeEach(function() {
+        request.type = "POST";
+      });
+      it("responds mocked response", function() {
+        $.ajax(request).done(function(data, textStatus, jqXHR) {
+          expect(data.name).toBeDefined();
+        });
+      });
+      it("responds mocked response when request has data", function() {
+        request.data = {agent: 12345};
+        $.ajax(request).done(function(data, textStatus, jqXHR) {
+          expect(data.name).toBeDefined();
+        });
+      });
+
+    });
+
+    describe("when the not-registered url is requested", function() {
+      beforeEach(function() {
+        request.url = "http://test.com/api/not_registered";
+      });
+      it("responds error message", function() {
+        $.ajax(request).done(function(data) {
+          expect(data).toEqual("The url[GET http://test.com/api/not_registered] is not registered to mock server");
+        });
+      });
+    });
+  }); // end of a string url
+
+  describe("when registred with a regular expression url", function() {
+    beforeEach(function() {
+      mockRequest = {url: /http:\/\/test.com\/api\?.+/ };
+      MockHttpServer.register(mockRequest, mockResponse);
+      request = { url: "http://test.com/api" };
+    });
+
+    describe("when request url matches the pattern of mockRequest's url", function() {
+      beforeEach(function() {
+        request.url += "?name=james"
+      });
+      it("responds mocked response", function() {
+        $.ajax(request).done(function(data, textStatus, jqXHR) {
+          expect(data.name).toBeDefined();
+        });
+      });
+    });
+
+    describe("when request url does not match the pattern of mockRequest's url", function() {
+      beforeEach(function() {
+        request.url += "/not_registered?name=james"
+      });
+      it("responds error message", function() {
+        $.ajax(request).done(function(data) {
+          expect(data).toEqual("The url[GET http://test.com/api/not_registered?name=james] is not registered to mock server");
+        });
+      });
     });
   });
 
-  it("responds error message for the not-registered request", function() {
-    $.ajax("http://test.com/api/not_registered").done(function(data) {
-      expect(data).toEqual("The url[http://test.com/api/not_registered] is not registered to mock server");
+  describe("when registered with method and url", function() {
+    beforeEach(function() {
+      mockRequest = { method: "post", url: "http://test.com/api" };
+      MockHttpServer.register(mockRequest, mockResponse);
+      request = { type: "POST", url: "http://test.com/api" };
+    });
+
+    describe("when POST url is requested", function() {
+      it("responds mocked response", function() {
+        $.ajax(request).done(function(data, textStatus, jqXHR) {
+          expect(data.name).toBeDefined();
+        });
+      });
+    });
+
+    describe("when GET url is requested", function() {
+      beforeEach(function() {
+        request.type = "GET"
+      });
+      it("responds error message", function() {
+        $.ajax(request).done(function(data) {
+          expect(data).toEqual("The url[GET http://test.com/api] is not registered to mock server");
+        });
+      });
+    });
+  }); // end of method and url
+
+  describe("when registred with url and headers", function() {
+    beforeEach(function() {
+      mockRequest = { 
+        url: "http://test.com/api",
+        headers: { "Auth": "1234" }
+      };
+      MockHttpServer.register(mockRequest, mockResponse);
+      request = { url: "http://test.com/api" };
+    });
+
+    describe("when requests with header ", function() {
+      beforeEach(function() {
+        request.headers = { auth: "1234" }
+      });
+
+      it("responds mocked response", function() {
+        $.ajax(request).done(function(data, textStatus, jqXHR) {
+          expect(data.name).toBeDefined();
+        });
+      });
+
+      it("responds mocked request regardless of additional headers", function() {
+        request.headers["name"] = "angel";
+        $.ajax(request).done(function(data, textStatus, jqXHR) {
+          expect(data.name).toBeDefined();
+        });        
+      });
+    });
+
+    describe("when requests with different header value", function() {
+      beforeEach(function() {
+        request.headers = { auth: "3333" }
+      });
+
+      it("responds error message", function() {
+        $.ajax(request).done(function(data) {
+          expect(data).toEqual("The url[GET http://test.com/api] is not registered to mock server");
+        });
+      });
+    });
+
+    describe("when requests without header value", function() {
+      beforeEach(function() {
+        request.headers = {}
+      });
+
+      it("responds error message", function() {
+        $.ajax(request).done(function(data) {
+          expect(data).toEqual("The url[GET http://test.com/api] is not registered to mock server");
+        });
+      });
+    });
+  }); // end of url and headers
+
+  describe("when registred with regular expression header", function() {
+    beforeEach(function() {
+      mockRequest = { 
+        url: "http://test.com/api",
+        headers: { "Auth": /\d+/ }
+      };
+      MockHttpServer.register(mockRequest, mockResponse);
+      request = { url: "http://test.com/api" };
+    });    
+
+    describe("when request header is matched with pattern", function() {
+      beforeEach(function() {
+        request.headers = { auth: "12345" }
+      });
+
+      it("responds mocked response", function() {
+        $.ajax(request).done(function(data, textStatus, jqXHR) {
+          expect(data.name).toBeDefined();
+        });
+      });
+    });
+
+    describe("when request header is not matched with pattern", function() {
+      beforeEach(function() {
+        request.headers = { auth: "WERKfweriuwERE" }
+      });
+
+      it("responds error message", function() {
+        $.ajax(request).done(function(data, textStatus, jqXHR) {
+          expect(data).toEqual("The url[GET http://test.com/api] is not registered to mock server");
+        });
+      });
+    });
+  }); // end of regular expression headers
+
+
+  describe("when registered with url and data", function() {
+    beforeEach(function() {
+      mockRequest = { 
+        url: "http://test.com/api",
+        data: { name: "james" }
+      };
+      MockHttpServer.register(mockRequest, mockResponse);
+      request = { type: "POST", url: "http://test.com/api" };
+    });
+
+    describe("when requests with data", function() {
+      beforeEach(function() {
+        setJsonData(request, {name: "james"});
+      });
+
+      it("responds mocked response", function() {
+        $.ajax(request).done(function(data, textStatus, jqXHR) {
+          expect(data.name).toBeDefined();
+        });
+      });
+
+      it("responds mocked request regardless of additional data", function() {
+        setJsonData(request, {name: "james", height: 100});
+        $.ajax(request).done(function(data, textStatus, jqXHR) {
+          expect(data.name).toBeDefined();
+        });        
+      });
+    });
+
+    describe("when requests with different data value", function() {
+      beforeEach(function() {
+        setJsonData(request, {name: "invalid"});
+      });
+
+      it("responds error message", function() {
+        $.ajax(request).done(function(data) {
+          expect(data).toEqual("The url[POST http://test.com/api] is not registered to mock server");
+        });
+      });
+    });
+
+    describe("when requests without data value", function() {
+      beforeEach(function() {
+        setJsonData(request, {height: 100});
+      });
+
+      it("responds error message", function() {
+        $.ajax(request).done(function(data) {
+          expect(data).toEqual("The url[POST http://test.com/api] is not registered to mock server");
+        });
+      });
+    });
+  }); // end of url and data
+
+  describe("when registred with regular expression data", function() {
+    beforeEach(function() {
+      mockRequest = { 
+        url: /http:\/\/test.com\/api\??.*/,
+        data: { height: /\d+/ }
+      };
+      MockHttpServer.register(mockRequest, mockResponse);
+      request = { type: "POST", url: "http://test.com/api" };
+    });    
+
+    describe("when request data is matched with pattern", function() {
+      beforeEach(function() {
+        setJsonData(request, {height: "12345"});
+      });
+
+      it("responds mocked response", function() {
+        $.ajax(request).done(function(data, textStatus, jqXHR) {
+          expect(data.name).toBeDefined();
+        });
+      });
+    });
+
+    describe("when request data is not matched with pattern", function() {
+      beforeEach(function() {
+        setJsonData(request, {height: "wer"});
+      });
+
+      it("responds error message", function() {
+        $.ajax(request).done(function(data, textStatus, jqXHR) {
+          expect(data).toEqual("The url[POST http://test.com/api] is not registered to mock server");
+        });
+      });
+    });
+  }); // end of regular expression headers
+
+
+  describe("when requestText is not a json format", function() {
+    beforeEach(function() {
+      mockRequest = { 
+        url: /http:\/\/test.com\/api\??.*/,
+        data: { height: /\d+/ }
+      };
+      MockHttpServer.register(mockRequest, mockResponse);
+
+      request = { type: "POST", url: "http://test.com/api" };
+      request.data = "name=james";
+      request.contentType = "application/json";
+    });
+
+    it("responds error", function() {
+        $.ajax(request).done(function(data, textStatus, jqXHR) {
+          expect(data).toEqual("requestText[\"name=james\"] is not valid json");
+        });
     });
   });
+  
+});
+
+
+describe("backbone.js test", function() {
 
 });
+
+describe("angular.js test", function() {
+
+})
 

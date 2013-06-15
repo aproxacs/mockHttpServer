@@ -1,3 +1,237 @@
+MockHttpServer = function(global) {
+    var store = {};
+    // replace XMLHTTPRequest
+    store.GlobalXMLHttpRequest = global.XMLHttpRequest;
+    store.GlobalActiveXObject = global.ActiveXObject;
+    store.supportsActiveX = typeof store.GlobalActiveXObject != "undefined";
+    store.supportsXHR = typeof store.GlobalXMLHttpRequest != "undefined";
+    store.workingXHR = store.supportsXHR ? store.GlobalXMLHttpRequest : store.supportsActiveX
+                                   ? function() { return new store.GlobalActiveXObject("MSXML2.XMLHTTP.3.0") } : false;
+
+    var mocked = {};
+    function mockRespond(xhr) {
+
+        parseRequestText(xhr);
+        // console.log(xhr)
+
+        var mock = getFirstMatchedMock(xhr);
+        if(mock) {
+            setHeaders(xhr, mock.response.headers);
+
+            var data = mockJson.generateTemplate(mock.response.template);
+            xhr.receive(mock.response.status, data);
+        }        
+        else {
+            // console.log("nothing matched");
+            xhr.receive(200, "The url[" + xhr.method + " " + xhr.url + "] is not registered to mock server");
+        }
+    }
+
+    function getFirstMatchedMock(xhr) {
+        for( key in mocked ) {
+            var mock = mocked[key];
+
+            if( isRequestMatched(xhr, mock.request) ) {
+                return mock;
+            }
+        }
+        return null;
+    }
+
+    function parseRequestText(xhr) {
+        xhr.requestData = null;
+
+        if(!xhr.requestText) { return null; }
+        
+        var mimetype = xhr.getRequestHeader("content-type");
+        mimetype = mimetype && mimetype.split(';', 1)[0];
+
+        if(mimetype === "application/json") {
+            xhr.requestData = parseJson(xhr);
+        }
+        if(mimetype === "application/x-www-form-urlencoded") {
+            xhr.requestData = parseUrlEncoded(xhr.requestText);
+        }
+    }
+
+    function parseJson(xhr) {
+        try {
+            return JSON.parse(xhr.requestText);
+        }
+        catch(err) {
+            // console.log("requestText is not a json format")
+            xhr.receive(200, "requestText[\"" + xhr.requestText + "\"] is not valid json")
+            return null;
+        }
+    }
+
+    function parseUrlEncoded(xhr) {
+        var parser = /(?:^|&)([^&=]*)=?([^&]*)/g;
+        var data = {};
+
+        try {
+            xhr.requestText.replace(parser, function ($0, $1, $2) {
+                if ($1) data[$1] = $2;
+            });
+            return data;
+        }
+        catch(err) {
+            return null;
+        }
+    }
+
+    function isRequestMatched(xhr, mockRequest) {
+        // console.log(isMethodMatched(xhr, mockRequest))
+        // console.log(isUrlMatched(xhr, mockRequest))
+        // console.log(isHeaderMatched(xhr, mockRequest))
+        // console.log(isDataMatched(xhr, mockRequest))
+        try {
+            return ( isMethodMatched(xhr, mockRequest) && 
+                     isUrlMatched(xhr, mockRequest) &&
+                     isHeaderMatched(xhr, mockRequest) &&
+                     isDataMatched(xhr, mockRequest)
+            );
+        }
+        catch(err) {
+            // console.log(err)
+            return false;            
+        }
+    }
+
+    function isMethodMatched(xhr, mockRequest) {
+        if( !mockRequest.method ) { return true; }
+        return xhr.method.toLowerCase() === mockRequest.method.toLowerCase()
+    }
+
+    function isUrlMatched(xhr, mockRequest) {
+        // console.log(mockRequest.url)
+        // console.log(xhr.url)
+        return isTextMatched(mockRequest.url, xhr.url);
+    }
+
+    function isHeaderMatched(xhr, mockRequest) {
+        return isObjectMatched(mockRequest.headers, xhr.requestHeaders);
+    }
+
+    function isDataMatched(xhr, mockRequest) {
+        // console.log(xhr.requestText)
+        // console.log(mockRequest.data)
+        return isObjectMatched(mockRequest.data, xhr.requestData || {});
+    }
+
+    // left comes from mockRequest, it may be a string or regular expression.
+    // right comes from xhr(real request), it must be a string.
+    function isTextMatched(left, right) {
+        if(right === undefined || right === null) { return false; }
+
+        if(typeof left === "string") {
+            return (left === right);
+        }
+        else {
+            // assume right is regular expression
+            return left.test(right)
+        }
+    }
+
+    // left comes from mockRequest
+    // right comes from xhr
+    function isObjectMatched(left, right) {
+        for( key in left ) {
+            var value = left[key];
+
+            // if value is set to null, it means this value must not be present in right.
+            // for example,
+            // 
+            // left = { 
+            //   auth: null
+            // }
+            // right = {
+            // }
+            // then, it returns true, because right does not have Auth. 
+            // Otherwise, if right has auth, it returns false.
+            if ( value === null ) {
+                if( right[key] ) {
+                    return false;
+                }
+            }
+            else {
+                if( !isTextMatched(value, right[key]) ) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    function setHeaders(xhr, headers) {
+        for( key in headers ) {
+            xhr.setResponseHeader(key, headers[key]);    
+        }
+    }
+
+    function downcaseKeys(obj) {
+        if(!obj) { return; }
+
+        for(key in obj) {
+            value = obj[key];
+            delete obj[key];
+            obj[key.toLowerCase()] = value;
+        }
+    }
+
+
+    return {
+        register: function(request, response) {
+            var key = Math.random().toString(36);
+
+            downcaseKeys(request.headers);
+            downcaseKeys(response.headers);
+
+            mocked[key] = {
+                request: request,
+                response: response
+            }
+
+            return key;
+        },
+
+        deregister: function(key) {
+            delete mocked[key];
+        },
+
+        getMocked: function(key) {
+            return mocked[key] || null;
+        },
+
+        clearMocked: function() {
+            mocked = {};
+        },
+
+        on: function() {
+            function Request () {
+                this.onsend = function () {
+                    mockRespond(this);
+                };
+                MockHttpRequest.apply(this, arguments);
+            }
+            Request.prototype = MockHttpRequest.prototype;
+
+            global.XMLHttpRequest = Request;
+        },
+
+        off: function() {
+            global.XMLHttpRequest = store.GlobalXMLHttpRequest;
+        }
+    }
+  
+
+}(this);
+
+
+
+
+
 /*
  * Mock XMLHttpRequest (see http://www.w3.org/TR/XMLHttpRequest)
  *
@@ -386,157 +620,14 @@ MockHttpRequest.prototype = {
 };
 
 
-
-MockHttpServer = function(global) {
-    var store = {};
-    // replace XMLHTTPRequest
-    store.GlobalXMLHttpRequest = global.XMLHttpRequest;
-    store.GlobalActiveXObject = global.ActiveXObject;
-    store.supportsActiveX = typeof store.GlobalActiveXObject != "undefined";
-    store.supportsXHR = typeof store.GlobalXMLHttpRequest != "undefined";
-    store.workingXHR = store.supportsXHR ? store.GlobalXMLHttpRequest : store.supportsActiveX
-                                   ? function() { return new store.GlobalActiveXObject("MSXML2.XMLHTTP.3.0") } : false;
-
-    var mocked = {};
-    function mockRespond(xhr) {
-        for( key in mocked ) {
-            var mock = mocked[key];
-
-            if( isRequestMatched(xhr, mock.request) ) {
-                setHeader(xhr, mock.response.header);
-
-                var data = mockJson.generateTemplate(mock.response.template);
-                xhr.receive(mock.response.status, data);
-
-                return;
-            }
-        }
-
-        console.log("nothing matched");
-        xhr.receive(200, "The url[" + xhr.url + "] is not registered to mock server");
-    }
-
-    function isRequestMatched(xhr, request) {
-        // console.log(isMethodMatched(xhr, request))
-        // console.log(isUrlMatched(xhr, request))
-        // console.log(isHeaderMatched(xhr, request))
-        // console.log(isDataMatched(xhr, request))
-        return ( isMethodMatched(xhr, request) && 
-                 isUrlMatched(xhr, request) &&
-                 isHeaderMatched(xhr, request) &&
-                 isDataMatched(xhr, request)
-        );
-    }
-
-    function isMethodMatched(xhr, request) {
-        if( !request.method ) { return true; }
-        return xhr.method.toLowerCase() === request.method.toLowerCase()
-    }
-
-    function isUrlMatched(xhr, request) {
-        return isTextMatched(request.url, xhr.url);
-    }
-
-    function isHeaderMatched(xhr, request) {
-        return isObjectMatched(request.header, xhr.requestHeaders);
-    }
-
-    function isDataMatched(xhr, request) {
-        return isObjectMatched(request.data, JSON.parse(xhr.requestText));
-    }
-
-    // right comes from request, it may be string or regular expression.
-    // left must be string
-    function isTextMatched(right, left) {
-        if(typeof right === "string") {
-            return (right === left);
-        }
-        else {
-            // assume right is regular expression
-            return right.test(left)
-        }
-    }
-
-    // left comes from request
-    function isObjectMatched(left, right) {
-        for( key in left ) {
-            var value = left[key];
-
-            // if value is set to null, it means this value must not be present
-            // for example,
-            // 
-            // request = { 
-            //   header: { Authorization: null } 
-            // }
-            //
-            // It means that 'if a request has Authorization header, it is not matched.'
-            if ( value === null ) {
-                if( right[key] ) {
-                    return false;
-                }
-            }
-            else {
-                if( !isTextMatched(value, right[key]) ) {
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
-
-    function setHeader(xhr, header) {
-        for( key in header ) {
-            xhr.setResponseHeader(key, header[key]);    
-        }
-    }
-
-
-    return {
-        register: function(request, response) {
-            var key = Math.random().toString(36);
-
-            mocked[key] = {
-                request: request,
-                response: response
-            }
-
-            return key;
-        },
-
-        deregister: function(key) {
-            delete mocked[key];
-        },
-
-        getMocked: function() {
-            return mocked;
-        },
-
-        clearMocked: function() {
-            mocked = {};
-        },
-
-        on: function() {
-            function Request () {
-                this.onsend = function () {
-                    mockRespond(this);
-                };
-                MockHttpRequest.apply(this, arguments);
-            }
-            Request.prototype = MockHttpRequest.prototype;
-
-            global.XMLHttpRequest = Request;
-        },
-
-        off: function() {
-            global.XMLHttpRequest = store.GlobalXMLHttpRequest;
-        }
-    }
-  
-
-}(this);
-
-
+//
+// mockJson comes from mockJSON(http://experiments.mennovanslooten.nl/2010/mockjson/)
+// 
+// I wanted to use only template part without jQuery dependancy.
+// 
+// - removed jQuery part.
+// - removed rand() function. rand() is replaced with Math.random()
+//
 var mockJson = function() {
 
     function getRandomData(key) {
@@ -546,8 +637,6 @@ var mockJson = function() {
         var params = key.match(/\(([^\)]+)\)/g) || [];
         
         if (!(key in mockJson.data)) {
-            console.log(key);
-            console.log(params);
             return key;
         }
         

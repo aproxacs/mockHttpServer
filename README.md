@@ -59,22 +59,14 @@ then,
 If registered mock request has url and data, data is treated same as headers.
 
 
-## Codes and Reference
-All codes are in `js/mock_http_server.js` file.
-
-MockHttpRequest comes from https://github.com/philikon/MockHttpRequest. Sinon is nice but seems too complicate to import.
-
-mockJSON is imported to manage response template.
-
-MockHttpServer is the mock server, similar to sinon.js FakeServer. It provides an interface to register mock request and respnse, and turn on/off the server. And if a mathed request comes, it responds appropriate headers and template.
-
-
-## Test Spec
-Test spec was written using jasmine. To execute spec, run spec_runner.html file with the browser.
-
 
 
 ## Usage
+- Simple Usage
+- regular expression
+- caution : order matters
+- content-type : json, or url-encoded
+
 1 Registering
 
     var request = {
@@ -110,12 +102,44 @@ Test spec was written using jasmine. To execute spec, run spec_runner.html file 
 more examples are in `js/example.js` file.
 
 
+
+## Codes and Reference
+All codes are in `js/mock_http_server.js` file.
+It is consisted of 3 parts, MockHttpRequest, mockJson, and MockHttpServer.
+
+#### MockHttpRequest
+MockHttpRequest comes from https://github.com/philikon/MockHttpRequest. Sinon is nice but seems too complicate to import.
+
+#### mockJson
+mockJSON is imported to manage response template.
+
+#### MockHttpServer
+MockHttpServer is the mock server, similar to sinon.js FakeServer. It provides an interface to register mock request and respnse, and turn on/off the server. And if a mathed request comes, it responds appropriate headers and template.
+
+
+## Test
+Tests were written using jasmine.(http://pivotal.github.io/jasmine/)
+To run spec, run `spec_runner.html` file with the browser.
+
+
+
+
 ## TODO
-- test with angular, backbone.
-- IE support
-- more test
-- refactoring
-- more examples(box.net)
+- test with angular, backbone. : 2h
+
+
+- documentation : 2h
+
+- easy addding for access_token : 2h
+- box.net examples : 1h
+
+- IE support : 1h
+
+werwer
+
+    MockHttpServer.addAccessToken({host: "box.net", access_token_key: "Authorization", access_token: "aa"})
+
+
 
 Please review my codes and let me know if I am going right.
 

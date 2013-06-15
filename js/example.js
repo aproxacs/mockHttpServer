@@ -94,3 +94,9 @@ $.ajax("https://api.box.com/2.0/files").done(function(data) {
 });
 
 
+
+
+MockHttpServer.boxRegister(access_token, request, response);
+// => regist valid case and invalid case for access_token
+
+// MockHttpServer.boxApi(access_token).register
