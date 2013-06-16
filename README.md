@@ -1,15 +1,110 @@
-## Idea
-basic flow is like below.
-1. Register requests and responses. Request has 4 parts.(method, url, headers, data) Only url is mandatory, and others are optional. Respond has 2 parts, headers and template. The template is the same as mockJSON.
-2. Turn on MockHttpServer. Now all ajax request is handled by MockHttpServer server.
-3. Send an ajax request. If a sending request matches to one of registered, server will respond with registered headers and template. If not, server will respond with error message.
-4. Turn off MockHttpServer when you want to send a request to a real server.
+## About mockHttpServer
+[mockJSON](http://experiments.mennovanslooten.nl/2010/mockjson/) is great tool when mocking ajax request with jquery. It is easy to use, and provides very useful templates. But it is jquery plugin, which means it is impossible to use without jquery like angular.js. The main goal of this project is to create a general XHR mocking server having mockJSON's template feature.
+
+mockHttpServer is begins with [Cloudspokes Challenge](http://www.cloudspokes.com/challenges/2333).
+
+### Basic Flow
+1. Register mockRequests/mockResponses to the mockHttpServer. 
+2. Turn on MockHttpServer. Now all XHR requests are handled by mockHttpServer.
+3. Send a XHR request. If a request matches to the one of registered mockRequest, server will respond with correspoding mockResponse. If not, server will respond with error(status 500).
+4. Turn off MockHttpServer when you want to send a request to the real server.
 5. Whenever you want to use MockHttpServer, just turn on the server.
 
-### Finding matching request.
-If registered mock request only has url, then all requests with the url is matched. Url can be string or regular expression.
 
-    var request = {url: "http://test.com/api"}
+## Usage
+
+### Simple Example
+
+    var mockRequest = {
+      url: "http://api.box.com/2.0/folders/abc/items"
+    };
+    var mockResponse = {
+      template: {"name|1-3": "@LETTER_UPPER@LOREM"}
+    };
+    MockHttpServer.register(mockRequest, mockResponse);
+    
+    MockHttpServer.on
+    // now all XHR requests are intercepted by MockHttpServer
+    //
+    MockHttpServer.off
+    // now XHR requests are sent to the real server.
+
+
+#### Advanced Example
+
+    var mockRequest = {
+      method: "POST",
+      url: "http://api.box.com/2.0/folders/abc/items"
+      headers: {
+        "content-tag" : /application\/\w+/,
+        "authorization" : null
+      },
+      data: {
+        "name": "stars",
+        "owner": /^james.*/,
+        "directory": null
+      }
+    };
+    var mockResponse = {
+      status: 200,
+      headers: {
+        "ETag" : "23n423o8ufjwleijr32"
+      }
+      template: {"name|1-3": "@LETTER_UPPER@LOREM"},
+      timeout: 59
+    };
+    MockHttpServer.register(mockRequest, mockResponse);
+
+#### mockRequest
+mockRequest is registered to MockHttpServer, and when XHR request comes in to the server, server finds if request is matched to registered mockRequest.
+
+Possible options of mockRequest are url, method, headers, data. Among them, url is mandatory.
+
+`url` : URL of the request. can be String or Reqular Expression. It includes query parts.
+
+`method` : "GET", "POST", "PUT", "DELETE"
+
+`headers` : HTTP headers of the request. The value of header can be String or Regular Expression. 
+
+`data` : data of the request. The value of data can be String or Regular Expression.
+
+`requireAccessToken` : see `Setting Access Token` section below.
+
+### mockResponse
+The mockResponse is about how to send a response when XHR request matches to mockRequest.
+
+Possible options are status, headers, template, templateName, and timeout.
+
+`status` : default is 200
+`headers` : HTTP headers of the response. Sets 'content-tag' as `application/json`, because response type is always json.
+`template` : Template to generate response data. Almost same as [mockJSON](http://experiments.mennovanslooten.nl/2010/mockjson/)
+`templateName` : If template stats with array, it needs template name to specify the size of array. For example,
+
+    mockResponse = {
+      template: [ 
+        {"name|1-3": "@LETTER_UPPER@LOREM "} 
+      ],
+      templateName: "books|3-3"
+    }
+
+It generates, 3 book objects.
+
+`timeout` : The delay time of response. Server will delay before sending response. The default value is 10(ms).
+
+
+### Registering/Deregistering mockRequest/mockResponse
+MockHttpServer.register returns key of registered mockRequest. You can delete registered mockRequest by the returned key.
+
+    key = MockHttpServer.register(mockRequest, mockResponse);
+    MockHttpServer.deregister(key);
+
+
+### Finding matching request.
+How does the server find mathing mockRequest? The basic principle is finding the first one matching all options. 
+
+If mockRequest has only a url, then all XHR requests statisfying the url is matched. It doesn't care about method or headers or data.
+
+    var mockRequest = { url: "http://test.com/api" }
 
 then,
 
@@ -18,9 +113,12 @@ then,
     GET http://test.com/api with some header => Matched
     GET http://test.com/other_api => NOT Matched
 
-If registered mock request has url and method, matching request should has the same method, url.
+If mockRequest has url and method, then XHR requests should have the same url and method to match. It doesn't care about headers or data.
 
-    var request = {method: "post", url: "http://test.com/api"}
+    var request = {
+      method: "post", 
+      url: "http://test.com/api"
+    }
 
 then,
 
@@ -29,7 +127,7 @@ then,
     GET http://test.com/api => Not Matched
     POST http://test.com/other_api => Not Matched
 
-If registered mock request has url and headers, matching request should include specified headers. It is ok for request to have more headers. The value of header may be String or Regulare Expression.
+If mockRequest has headers, server checks if XHR request satisfies the header of mockRequest in addition to the url. 
 
     var request = {
       url: "http://test.com/api", 
@@ -44,7 +142,7 @@ then,
     POST http://test.com/api with header {Auth: "222"} => Not Matched
     POST http://test.com/api with header {} => Not Matched
 
-The value of header may be null, which means matching request should not have the header.
+The value of header may be String, Regulare Expression or `null`. What does `null` mean? It means this header should not exist in the XHR request.
 
     var request = {
       url: "http://test.com/api", 
@@ -53,54 +151,63 @@ The value of header may be null, which means matching request should not have th
 
 then,
 
-    POST http://test.com/api with header {Auth: "12345"} => Not Matched
-    POST http://test.com/api with header {Tag: "value"} => Matched
+    POST http://test.com/api with header {Auth: "12345"} => Not Matched because Auth header exist.
+    POST http://test.com/api with header {} => Matched
 
-If registered mock request has url and data, data is treated same as headers.
-
-
+data is treated same as headers.
 
 
-## Usage
-- Simple Usage
-- regular expression
-- caution : order matters
-- content-type : json, or url-encoded
-
-1 Registering
+### Setting Access Token
+Box.net requires access token for some requests. It responses error when access token is invalid. It can be mocked like below.
 
     var request = {
-      method: "get",
-      url: /https:\/\/api.box.com\/2.0\/folders\/\w+\/items/, 
+      url: "http://api.box.com/2.0/folders/abc/items",
       header: {
         Authorization: "Valid ACCESS_TOKEN" 
       }
     };
     var response = {
-      status: 200,
-      header: {ETag:"fb1567f361f1fb8ce8951a9bb80f496b"},
+      template: {"name|1-3": "@LETTER_UPPER@LOREM "}
+    };
+    MockHttpServer.register(request, response);
+    request = {
+      url: "http://api.box.com/2.0/folders/abc/items",
+      header: {
+        Authorization: "Invalid ACCESS_TOKEN" 
+      }
+    };
+    // error response
+    response = {
+      template: {"errorCode": "PARTNER_AUTHENTICATION_FAILED"}
+    };
+    MockHttpServer.register(request, response);
+
+However, it is very inefficient, because it needs 2 mockRequest for every url, and need to set Authorization header for every mockRequest. Instead, you can set access token for the api.box.com host like below
+
+    MockHttpServer.setAccessToken({
+       host: "api.box.net", 
+       key: "Authorization", 
+       value: "Valid Access Token",
+       errorResponse: {
+         status: 401,
+         template: { "errorCode": "PARTNER_AUTHENTICATION_FAILED" }
+       }
+    });
+
+And then, register mockRequest like below.
+
+    var request = {
+      url: "http://api.box.com/2.0/folders/abc/items",
+      requireAccessToken: true
+    };
+    var response = {
       template: {"name|1-3": "@LETTER_UPPER@LOREM "}
     };
     MockHttpServer.register(request, response);
 
-2 Turning on the mock server.
-  
-    MockHttpServer.on();
+If requireAccessToken is set true, server will check access token for matched XHR request. If XHR request does not Authorization header, or access token is invalid, server will respond with errorResponse.
 
-3 Ajax request.
-
-    $.ajax("https://api.box.com/2.0/folders/aaa/items", {
-      headers: {Authorization: "Valid ACCESS_TOKEN"}
-    }).done(function(data) {
-      console.log(data);
-    });
-
-4 Turning off ther mock server.
-
-    MockHttpServer.off();
-
-more examples are in `js/example.js` file.
-
+### Handling errors
 
 
 ## Codes and Reference
@@ -108,32 +215,22 @@ All codes are in `js/mock_http_server.js` file.
 It is consisted of 3 parts, MockHttpRequest, mockJson, and MockHttpServer.
 
 #### MockHttpRequest
-MockHttpRequest comes from https://github.com/philikon/MockHttpRequest. Sinon is nice but seems too complicate to import.
+MockHttpRequest comes from [MockHttpRequest](https://github.com/philikon/MockHttpRequest). It mocks XMLHttpRequest.
 
 #### mockJson
-mockJSON is imported to manage response template.
+[mockJSON](http://experiments.mennovanslooten.nl/2010/mockjson/) is imported to manage response template.
 
 #### MockHttpServer
-MockHttpServer is the mock server, similar to sinon.js FakeServer. It provides an interface to register mock request and respnse, and turn on/off the server. And if a mathed request comes, it responds appropriate headers and template.
+MockHttpServer provides an interface to register mockRequest/mockResponse, set access token, and turn on/off the server. When the sever is on, it intercepts XHR requests, works as a fake server.
 
 
 ## Test
-Tests were written using jasmine.(http://pivotal.github.io/jasmine/)
-To run spec, run `spec_runner.html` file with the browser.
-
+Tests were written using [jasmine](http://pivotal.github.io/jasmine/). To run spec, run `spec_runner.html` file with the browser.
 
 
 
 ## TODO
-- test with angular, backbone. : 2h
-
-
-- documentation : 2h
+- test with angular : 2h
 - box.net examples : 1h
-
-
-
-
-Please review my codes and let me know if I am going right.
 
 Thank you.

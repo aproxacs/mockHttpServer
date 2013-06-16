@@ -34,28 +34,39 @@ MockHttpServer = function(global) {
     }
 
     function handleError(err) {
+        var errorMsg = null;
         if(err === "Invalid JSON") {
-            xhr.receive(200, "requestText[\"" + xhr.requestText + "\"] is not valid json")
+            errorMsg = "requestText[\"" + xhr.requestText + "\"] is not valid json";
         }
         if(err === "Invalid Access Token") {
             var accessToken = getAccessToken(xhr.urlParts.host);
-            sendMockResponse(accessToken.errorResponse);
+            return sendMockResponse(accessToken.errorResponse);
         }
         if(err === "Access Token Not Registered") {
-            xhr.receive(200, "accessToken for " + xhr.urlParts.host + " is not registered yet.");        
+            errorMsg = "accessToken for " + xhr.urlParts.host + " is not registered yet.";        
         }
         if(err === "Not Registered") {
-            xhr.receive(200, "The url[" + xhr.method + " " + xhr.url + "] is not registered to mock server");
+            errorMsg = "The url[" + xhr.method + " " + xhr.url + "] is not registered to mock server";
         }
+
+        // console.log(msg)
+        xhr.receive(500, errorMsg);
     }
 
     function sendMockResponse(response) {
-        // console.log(response);
-        setHeaders(response.headers);
+        var mockXhr = xhr;
 
-        var data = mockJson.generateTemplate(response.template);
-        // console.log(data)
-        xhr.receive(response.status, data);
+        // use timeout to give some delay like a real server.
+        setTimeout(function() {
+            var headers = response.headers || {};
+            headers["content-type"] = "application/json";
+            setHeaders(headers);
+
+            var data = mockJson.generateTemplate(response.template, response.templateName);
+            data = JSON.stringify(data);        
+            // console.log(data)
+            mockXhr.receive(response.status || 200, data);
+        }, response.timeout || 10);
     }
 
 
@@ -221,6 +232,7 @@ MockHttpServer = function(global) {
     }
 
     function setHeaders(headers) {
+        // console.log(headers)
         for( key in headers ) {
             xhr.setResponseHeader(key, headers[key]);    
         }
@@ -239,7 +251,7 @@ MockHttpServer = function(global) {
 
     return {
         // Usage :
-        // MockHttpServer.addAccessToken({
+        // MockHttpServer.setAccessToken({
         //    host: "box.net", 
         //    key: "Authorization", 
         //    value: "aa",
