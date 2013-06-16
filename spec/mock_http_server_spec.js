@@ -1,4 +1,4 @@
-xdescribe("MockHttpServer", function() {
+describe("MockHttpServer", function() {
   var mockRequest = {url: "http://test.com/api"};
   var mockResponse = {status: 200, headers: {}, template: {}};
   var mockedKey = null;

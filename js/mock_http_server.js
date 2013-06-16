@@ -1,12 +1,10 @@
 MockHttpServer = function(global) {
     var store = {};
-    // replace XMLHTTPRequest
+
     store.GlobalXMLHttpRequest = global.XMLHttpRequest;
     store.GlobalActiveXObject = global.ActiveXObject;
     store.supportsActiveX = typeof store.GlobalActiveXObject != "undefined";
     store.supportsXHR = typeof store.GlobalXMLHttpRequest != "undefined";
-    store.workingXHR = store.supportsXHR ? store.GlobalXMLHttpRequest : store.supportsActiveX
-                                   ? function() { return new store.GlobalActiveXObject("MSXML2.XMLHTTP.3.0") } : false;
 
     var mocked = {};
     var accessTokens = {};
@@ -123,6 +121,7 @@ MockHttpServer = function(global) {
         }
     }
 
+    // TODO : it does not parse nested elements
     function parseUrlEncoded(text) {
         var parser = /(?:^|&)([^&=]*)=?([^&]*)/g;
         var data = {};
@@ -292,11 +291,31 @@ MockHttpServer = function(global) {
             }
             Request.prototype = MockHttpRequest.prototype;
 
-            global.XMLHttpRequest = Request;
+            // console.log(store);
+            if (store.supportsXHR) {
+                global.XMLHttpRequest = Request;
+            }
+
+            if (store.supportsActiveX) {
+                global.ActiveXObject = function ActiveXObject(objId) {
+                    if (objId == "Microsoft.XMLHTTP" || /^Msxml2\.XMLHTTP/i.test(objId)) {
+
+                        return new Request();
+                    }
+
+                    return new store.GlobalActiveXObject(objId);
+                };
+            }
         },
 
         off: function() {
-            global.XMLHttpRequest = store.GlobalXMLHttpRequest;
+            if (store.supportsXHR) {
+                global.XMLHttpRequest = store.GlobalXMLHttpRequest;
+            }
+
+            if (store.supportsActiveX) {
+                global.ActiveXObject = store.GlobalActiveXObject;
+            }
         }
     }
   

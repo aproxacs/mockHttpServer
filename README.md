@@ -129,11 +129,8 @@ To run spec, run `spec_runner.html` file with the browser.
 
 
 - documentation : 2h
-
-
 - box.net examples : 1h
 
-- IE support : 1h
 
 
 
