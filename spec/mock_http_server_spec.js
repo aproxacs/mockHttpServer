@@ -15,8 +15,9 @@ describe("MockHttpServer", function() {
   describe("on", function() {
     it("changes XMLHttpRequest to MockHttpRequest", function() {
       MockHttpServer.on();
+
       var obj = new XMLHttpRequest();
-      expect(obj instanceof MockHttpRequest).toEqual(true);
+      expect(obj instanceof MockHttpRequest).toBe(true);
     });
   });
 
@@ -24,8 +25,9 @@ describe("MockHttpServer", function() {
     it("changes XMLHttpRequest to original", function() {
       MockHttpServer.on();
       MockHttpServer.off();
+
       var obj = new XMLHttpRequest();
-      expect(obj instanceof XMLHttpRequest).toEqual(true);
+      expect(obj instanceof MockHttpRequest).toBe(false);
     });
   });
 
@@ -53,11 +55,12 @@ describe("MockHttpServer", function() {
     })
   });
 });
+
+
 describe("jQuery test", function() {
   var mockRequest = null; 
   var mockResponse = null;
   var request = null;
-  // var called = false;
 
   beforeEach(function() {
     mockResponse = {

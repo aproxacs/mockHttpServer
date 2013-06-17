@@ -1,19 +1,57 @@
 MockHttpServer = function(global) {
-    var store = {};
-
-    store.GlobalXMLHttpRequest = global.XMLHttpRequest;
-    store.GlobalActiveXObject = global.ActiveXObject;
-    store.supportsActiveX = typeof store.GlobalActiveXObject != "undefined";
-    store.supportsXHR = typeof store.GlobalXMLHttpRequest != "undefined";
-
     var mocked = {};
     var accessTokens = {};
     var xhr = null;
+    var isOn = false;
+
+    initialize(global);
+
+    function initialize(global) {
+        var globalXMLHttpRequest = global.XMLHttpRequest;
+        var globalActiveXObject = global.ActiveXObject;
+        var supportsActiveX = typeof globalActiveXObject != "undefined";
+        var supportsXHR = typeof globalXMLHttpRequest != "undefined";
+
+        var Request = function() {
+            this.onsend = function () {
+                mockRespond(this);
+            };
+            MockHttpRequest.apply(this, arguments);
+        }
+
+        if( supportsXHR ) {
+            global.XMLHttpRequest = function() {
+                if(isOn) {
+                    Request.prototype = MockHttpRequest.prototype;
+                    return new Request();
+                }        
+                else {
+                    return new globalXMLHttpRequest();
+                }
+            };
+        }
+        if( supportsActiveX ) {
+            global.ActiveXObject = function() {
+                if(isOn) {
+                    Request.prototype = MockHttpRequest.prototype;
+                    return new Request();
+                }        
+                else {
+                  try { return new globalActiveXObject("Msxml2.XMLHTTP.6.0"); } catch (e1) {}
+                  try { return new globalActiveXObject("Msxml2.XMLHTTP.3.0"); } catch (e2) {}
+                  try { return new globalActiveXObject("Msxml2.XMLHTTP"); } catch (e3) {}
+                  throw new Error("This browser does not support XMLHttpRequest.");
+                }
+            };
+        }    
+    }
+
+
 
     function mockRespond(mockXhr) {
 
         xhr = mockXhr;
-        // console.log(xhr)
+        console.log(xhr)
         try {
             parseRequestText();
 
@@ -295,39 +333,11 @@ MockHttpServer = function(global) {
         },
 
         on: function() {
-            function Request () {
-                this.onsend = function () {
-                    mockRespond(this);
-                };
-                MockHttpRequest.apply(this, arguments);
-            }
-            Request.prototype = MockHttpRequest.prototype;
-
-            // console.log(store);
-            if (store.supportsXHR) {
-                global.XMLHttpRequest = Request;
-            }
-
-            if (store.supportsActiveX) {
-                global.ActiveXObject = function ActiveXObject(objId) {
-                    if (objId == "Microsoft.XMLHTTP" || /^Msxml2\.XMLHTTP/i.test(objId)) {
-
-                        return new Request();
-                    }
-
-                    return new store.GlobalActiveXObject(objId);
-                };
-            }
+            isOn = true;
         },
 
         off: function() {
-            if (store.supportsXHR) {
-                global.XMLHttpRequest = store.GlobalXMLHttpRequest;
-            }
-
-            if (store.supportsActiveX) {
-                global.ActiveXObject = store.GlobalActiveXObject;
-            }
+            isOn = false;
         }
     }
   

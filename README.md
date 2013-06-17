@@ -13,6 +13,17 @@ mockHttpServer is begins with [Cloudspokes Challenge](http://www.cloudspokes.com
 
 ## Usage
 
+Include `mock_http_server.js` file inside of your HTML file's head. 
+
+    <head>
+      ...
+      <script type="text/javascript" src="js/mock_http_server.js"></script>
+      ...
+    </head>
+
+Please make sure `mock_http_server.js` file is located before any other javascript files. If not, it may not work. This is because `mock_http_server.js` uses the trick to replace XMLHttpRequest object. If any other liblary(for example angular.js), references XMLHttpRequest before `mock_http_server.js` and use it, mocking will not work.
+
+
 ### Simple Example
 
     var mockRequest = {
