@@ -51,7 +51,7 @@ MockHttpServer = function(global) {
     function mockRespond(mockXhr) {
 
         xhr = mockXhr;
-        console.log(xhr)
+        // console.log(xhr)
         try {
             parseRequestText();
 
