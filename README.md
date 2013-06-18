@@ -67,7 +67,8 @@ Please make sure `mock_http_server.js` file is located before any other javascri
     MockHttpServer.register(mockRequest, mockResponse);
 
 #### Box.com Exmaples
-see example.html and js/example.js file.
+run `example.html` file.
+it uses `js/example.js` file.
 
 #### mockRequest
 mockRequest is an endpoint registered to MockHttpServer. When XHR request comes in to the server, server finds if request is matched to registered mockRequest.
