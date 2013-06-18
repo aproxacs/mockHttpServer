@@ -51,7 +51,7 @@ MockHttpServer = function(global) {
     function mockRespond(mockXhr) {
 
         xhr = mockXhr;
-        // console.log(xhr)
+        console.log(xhr)
         try {
             parseRequestText();
 
@@ -93,7 +93,7 @@ MockHttpServer = function(global) {
 
     function sendMockResponse(response) {
         var mockXhr = xhr;
-
+        console.log(response)
         // use timeout to give some delay like a real server.
         setTimeout(function() {
             var headers = response.headers || {};
@@ -127,6 +127,7 @@ MockHttpServer = function(global) {
 
     function isInvalidAccessToken(accessToken) {
         var token = xhr.getRequestHeader(accessToken.key);
+        // console.log(token);
         if(!token && xhr.requestData) {
             token = xhr.requestData[accessToken.key];
         }
