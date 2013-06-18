@@ -51,7 +51,7 @@ MockHttpServer = function(global) {
     function mockRespond(mockXhr) {
 
         xhr = mockXhr;
-        console.log(xhr)
+        // console.log(xhr)
         try {
             parseRequestText();
 
@@ -87,13 +87,15 @@ MockHttpServer = function(global) {
             errorMsg = "The url[" + xhr.method + " " + xhr.url + "] is not registered to mock server";
         }
 
-        // console.log(msg)
+        errorMsg = "[" + err + "] " + errorMsg;
+
+        // console.log(errorMsg)
         xhr.receive(500, errorMsg);
     }
 
     function sendMockResponse(response) {
         var mockXhr = xhr;
-        console.log(response)
+        // console.log(response)
         // use timeout to give some delay like a real server.
         setTimeout(function() {
             var headers = response.headers || {};
@@ -167,7 +169,7 @@ MockHttpServer = function(global) {
             return JSON.parse(text);
         }
         catch(err) {
-            throw "Invalid JSON"
+            throw "Invalid JSON";
         }
     }
 
@@ -183,7 +185,7 @@ MockHttpServer = function(global) {
             return data;
         }
         catch(err) {
-            throw "Invalid URL Encoded"
+            throw "Invalid URL Encoded";
         }
     }
 
@@ -206,7 +208,7 @@ MockHttpServer = function(global) {
 
     function isMethodMatched(mockRequest) {
         if( !mockRequest.method ) { return true; }
-        return xhr.method.toLowerCase() === mockRequest.method.toLowerCase()
+        return xhr.method.toLowerCase() === mockRequest.method.toLowerCase();
     }
 
     function isUrlMatched(mockRequest) {
@@ -235,7 +237,7 @@ MockHttpServer = function(global) {
         }
         else {
             // assume right is regular expression
-            return left.test(right)
+            return left.test(right);
         }
     }
 
@@ -316,7 +318,7 @@ MockHttpServer = function(global) {
             mocked[key] = {
                 request: request,
                 response: response
-            }
+            };
 
             return key;
         },
@@ -744,6 +746,8 @@ MockHttpRequest.prototype = {
 // 
 // - removed jQuery part.
 // - removed rand() function. rand() is replaced with Math.random()
+// - generateTemplate function > case 'array' part : 
+//        if the label of array does not have range template, it just use input array.
 //
 var mockJson = function() {
 
@@ -808,8 +812,15 @@ var mockJson = function() {
             switch (type(template)) {
                 case 'array':
                     generated = [];
-                    for (var i = 0; i < length; i++) {
-                        generated[i] = mockJson.generateTemplate(template[0]);
+                    if(matches) {
+                        for (var i = 0; i < length; i++) {
+                            generated[i] = mockJson.generateTemplate(template[0]);
+                        }
+                    }
+                    else {
+                        for (var i = 0; i < template.length; i++) {
+                            generated[i] = mockJson.generateTemplate(template[i]);
+                        }                        
                     }
                     break;
 

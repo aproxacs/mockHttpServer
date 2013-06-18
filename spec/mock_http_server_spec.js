@@ -153,7 +153,7 @@ describe("jQuery test", function() {
       });
       it("responds error message", function() {
         ajaxRequest({error: function(xhr) {
-          expect(xhr.responseText).toEqual("The url[GET http://test.com/api/not_registered] is not registered to mock server");
+          expect(xhr.responseText).toMatch(/Not Registered/);
         }});
       });
     });
@@ -179,11 +179,11 @@ describe("jQuery test", function() {
 
     describe("when request url does not match the pattern of mockRequest's url", function() {
       beforeEach(function() {
-        request.url += "/not_registered?name=james"
+        request.url += "/not_registered?name=james";
       });
       it("responds error message", function() {
         ajaxRequest({error: function(xhr) {
-          expect(xhr.responseText).toEqual("The url[GET http://test.com/api/not_registered?name=james] is not registered to mock server");
+          expect(xhr.responseText).toMatch(/Not Registered/);
         }});
       });
     });
@@ -206,11 +206,11 @@ describe("jQuery test", function() {
 
     describe("when GET url is requested", function() {
       beforeEach(function() {
-        request.type = "GET"
+        request.type = "GET";
       });
       it("responds error message", function() {
         ajaxRequest({error: function(xhr) {
-          expect(xhr.responseText).toEqual("The url[GET http://test.com/api] is not registered to mock server");
+          expect(xhr.responseText).toMatch(/Not Registered/);
         }});
       });
     });
@@ -228,7 +228,7 @@ describe("jQuery test", function() {
 
     describe("when requests with header ", function() {
       beforeEach(function() {
-        request.headers = { auth: "1234" }
+        request.headers = { auth: "1234" };
       });
 
       it("responds mocked response", function() {
@@ -247,24 +247,24 @@ describe("jQuery test", function() {
 
     describe("when requests with different header value", function() {
       beforeEach(function() {
-        request.headers = { auth: "3333" }
+        request.headers = { auth: "3333" };
       });
 
       it("responds error message", function() {
         ajaxRequest({error: function(xhr) {
-          expect(xhr.responseText).toEqual("The url[GET http://test.com/api] is not registered to mock server");
+          expect(xhr.responseText).toMatch(/Not Registered/);
         }});
       });
     });
 
     describe("when requests without header value", function() {
       beforeEach(function() {
-        request.headers = {}
+        request.headers = {};
       });
 
       it("responds error message", function() {
         ajaxRequest({error: function(xhr) {
-          expect(xhr.responseText).toEqual("The url[GET http://test.com/api] is not registered to mock server");
+          expect(xhr.responseText).toMatch(/Not Registered/);
         }});
       });
     });
@@ -282,7 +282,7 @@ describe("jQuery test", function() {
 
     describe("when request header is matched with pattern", function() {
       beforeEach(function() {
-        request.headers = { auth: "12345" }
+        request.headers = { auth: "12345" };
       });
 
       it("responds mocked response", function() {
@@ -294,12 +294,12 @@ describe("jQuery test", function() {
 
     describe("when request header is not matched with pattern", function() {
       beforeEach(function() {
-        request.headers = { auth: "WERKfweriuwERE" }
+        request.headers = { auth: "WERKfweriuwERE" };
       });
 
       it("responds error message", function() {
         ajaxRequest({error: function(xhr) {
-          expect(xhr.responseText).toEqual("The url[GET http://test.com/api] is not registered to mock server");
+          expect(xhr.responseText).toMatch(/Not Registered/);
         }});
       });
     });
@@ -342,7 +342,7 @@ describe("jQuery test", function() {
 
       it("responds error message", function() {
         ajaxRequest({error: function(xhr) {
-          expect(xhr.responseText).toEqual("The url[POST http://test.com/api] is not registered to mock server");
+          expect(xhr.responseText).toMatch(/Not Registered/);
         }});
       });
     });
@@ -354,7 +354,7 @@ describe("jQuery test", function() {
 
       it("responds error message", function() {
         ajaxRequest({error: function(xhr) {
-          expect(xhr.responseText).toEqual("The url[POST http://test.com/api] is not registered to mock server");
+          expect(xhr.responseText).toMatch(/Not Registered/);
         }});
       });
     });
@@ -389,7 +389,7 @@ describe("jQuery test", function() {
 
       it("responds error message", function() {
         ajaxRequest({error: function(xhr) {
-          expect(xhr.responseText).toEqual("The url[POST http://test.com/api] is not registered to mock server");
+          expect(xhr.responseText).toMatch(/Not Registered/);
         }});
       });
     });
@@ -411,7 +411,7 @@ describe("jQuery test", function() {
 
     it("responds error", function() {
       ajaxRequest({error: function(xhr) {
-        expect(xhr.responseText).toEqual("requestText[\"name=james\"] is not valid json");
+        expect(xhr.responseText).toMatch(/Invalid JSON/);
       }});
     });
   });
@@ -450,7 +450,7 @@ describe("jQuery test", function() {
 
       it("responds error", function() {
         ajaxRequest({error: function(xhr) {
-            expect(xhr.responseText).toEqual("accessToken for test.com is not registered yet.");
+            expect(xhr.responseText).toMatch(/Access Token Not Registered/);
         }});
       });
     });
@@ -463,12 +463,9 @@ describe("jQuery test", function() {
 
       describe("for request without accessToken", function() {
         it("responds error", function() {
-          $.ajax(request).error(function(jqXHR, textStatus) {
-            expect(jqXHR.status).toEqual(401);
-          }).done(function() {
-            // should not come here
-            expect(true).toEqual(false);            
-          });
+          ajaxRequest({error: function(xhr) {
+            expect(xhr.status).toEqual(401);
+          }});
         });
       });
 
@@ -478,13 +475,9 @@ describe("jQuery test", function() {
         });
         
         it("responds error", function() {
-          $.ajax(request).error(function(jqXHR, textStatus) {
-            expect(jqXHR.status).toEqual(401);
-          }).done(function() {
-            // should not come here
-            expect(true).toEqual(false);            
-          });
-
+          ajaxRequest({error: function(xhr) {
+            expect(xhr.status).toEqual(401);
+          }});
         });
       });
 

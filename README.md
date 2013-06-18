@@ -70,9 +70,9 @@ Please make sure `mock_http_server.js` file is located before any other javascri
 see example.html and js/example.js file.
 
 #### mockRequest
-mockRequest is registered to MockHttpServer, and when XHR request comes in to the server, server finds if request is matched to registered mockRequest.
+mockRequest is an endpoint registered to MockHttpServer. When XHR request comes in to the server, server finds if request is matched to registered mockRequest.
 
-Possible options of mockRequest are url, method, headers, data. Among them, url is mandatory.
+Possible options of mockRequest are `url`, `method`, `headers`, and `data`. Among them, only `url` is mandatory.
 
 `url` : URL of the request. can be String or Reqular Expression. It includes query parts.
 
@@ -85,14 +85,14 @@ Possible options of mockRequest are url, method, headers, data. Among them, url 
 `requireAccessToken` : see `Setting Access Token` section below.
 
 ### mockResponse
-The mockResponse is about how to send a response when XHR request matches to mockRequest.
+The mockResponse is about how to send a response by server when XHR request matches to mockRequest.
 
-Possible options are status, headers, template, templateName, and timeout.
+Possible options are `status`, `headers`, `template`, `templateName`, and `timeout`.
 
 `status` : default is 200
 `headers` : HTTP headers of the response. Sets 'content-tag' as `application/json`, because response type is always json.
 `template` : Template to generate response data. Almost same as [mockJSON](http://experiments.mennovanslooten.nl/2010/mockjson/)
-`templateName` : If template stats with array, it needs template name to specify the size of array. For example,
+`templateName` : If template starts with array, it needs template name to specify the size of array. For example,
 
     mockResponse = {
       template: [ 
@@ -222,7 +222,21 @@ And then, register mockRequest like below.
 If requireAccessToken is set true, server will check access token for matched XHR request. If XHR request does not Authorization header, or access token is invalid, server will respond with errorResponse.
 
 ### Handling errors
+If error occurs while processing request, it sends 500 error with an error reason. So, when you work with MockHttpServer, use error handling callback to check errors. For example with jquery,
 
+    $(document).ajaxError(function(event, xhr) {
+      if(xhr.status === 500) {
+        alert(xhr.responseText);
+      }
+    });
+
+#### Error Reasons
+- Invalid JSON : 
+    when request body is not a valid json.
+- Access Token Not Registered :
+    when mockRequest requires access token, but access token is not set to MockHttpServer.
+- Not Registered :
+    when request does not match to any registered mockRequest.
 
 ## Codes and Reference
 All codes are in `js/mock_http_server.js` file.
@@ -241,9 +255,5 @@ MockHttpServer provides an interface to register mockRequest/mockResponse, set a
 ## Test
 Tests were written using [jasmine](http://pivotal.github.io/jasmine/). To run spec, run `spec_runner.html` file with the browser.
 
-
-
-## TODO
-- mockjson : array handling
 
 Thank you.

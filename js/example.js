@@ -13,11 +13,13 @@ $(function() {
     return str;
   }
 
+  // create random access token to use during test.
   var accessToken = randomString(20);
   $("#valid-access-token").text(accessToken);
   $("#request-access-token").val(accessToken);
 
 
+  // set access token to the server
   MockHttpServer.setAccessToken({
      host: "api.box.com", 
      key: "Authorization", 
@@ -28,6 +30,8 @@ $(function() {
      }
   });
 
+
+  // register endpoints
   var mockRequest = {
     url: "http://api.box.com/2.0/folders/cloudspokes/items",
     requireAccessToken: true
@@ -35,13 +39,20 @@ $(function() {
   var mockResponse = {
     template: {
       "total_count": 24,
-      "entries|2-2": [
+      "entries": [
           {
               "type": "folder",
               "id": "192429928",
               "sequence_id": "1",
               "etag": "1",
               "name|1-3": "@LETTER_UPPER@LOREM"
+          },
+          {
+              "type": "file",
+              "id": "818853862",
+              "sequence_id": "0",
+              "etag": "0",
+              "name": "Warriors.jpg"
           }
       ],
       "offset": 0,
@@ -164,8 +175,8 @@ $(function() {
     };
 
     $.ajax(request).success(function(data) {
-      console.log(data)
-      $("#output pre").html( JSON.stringify( data, null, 2 ) );
+      // console.log(data)
+      $("#output pre").html( JSON.stringify( data, null, 2 ) ).css("color", "#333");
     }).error(function(xhr) {
       var text = xhr.responseText;
       if(xhr.getResponseHeader("content-type") === "application/json") {
@@ -173,5 +184,6 @@ $(function() {
       }
       $("#output pre").html(text).css("color", "red");
     });
-  })
+  });
+
 });
