@@ -66,6 +66,9 @@ Please make sure `mock_http_server.js` file is located before any other javascri
     };
     MockHttpServer.register(mockRequest, mockResponse);
 
+#### Box.com Exmaples
+see example.html and js/example.js file.
+
 #### mockRequest
 mockRequest is registered to MockHttpServer, and when XHR request comes in to the server, server finds if request is matched to registered mockRequest.
 
@@ -241,8 +244,6 @@ Tests were written using [jasmine](http://pivotal.github.io/jasmine/). To run sp
 
 
 ## TODO
-- test with angular : 2h
-- box.net examples : 1h
-- we maybe need $.mockJSON.random = false. 
+- mockjson : array handling
 
 Thank you.
