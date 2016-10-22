@@ -254,7 +254,7 @@ MockHttpServer provides an interface to register mockRequest/mockResponse, set a
 
 
 ## Test
-Tests were written using [jasmine](http://pivotal.github.io/jasmine/). To run spec, run `spec_runner.html` file with the browser.
+Tests were written using [jasmine](https://jasmine.github.io/). To run spec, run `spec_runner.html` file with the browser.
 
 
 Thank you.
